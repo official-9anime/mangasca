@@ -7,7 +7,7 @@ class Asurascans {
     private results: { status: number | string; results: any[] };
 
     constructor() {
-        this.proxyUrl = "https://sup-proxy.zephex0-f6c.workers.dev/api-text?url=";
+        this.proxyUrl = "";
         this.parentUrl = "https://asurascans.io";
         this.results = {
             status: "",
