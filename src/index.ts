@@ -1,9 +1,14 @@
 import express from "express";
+import cors from "cors";
 import Asurascans from "./asurascans";
 
 const app = express();
 const port = process.env.PORT || 3000;
 const asurascans = new Asurascans();
+
+
+// Enable CORS for all origins
+app.use(cors());
 
 app.get("/", (req, res) => {
   res.send("Welcome to the Asurascans API");
