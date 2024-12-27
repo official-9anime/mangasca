@@ -1,12 +1,13 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
-import puppeteer from "puppeteer";
 
 class Asurascans {
+    private proxyUrl: string;
     private parentUrl: string;
     private results: { status: number | string; results: any[] };
 
     constructor() {
+        this.proxyUrl = "";
         this.parentUrl = "https://asurascans.io";
         this.results = {
             status: "",
@@ -14,20 +15,9 @@ class Asurascans {
         };
     }
 
-    // Helper to delay between requests
-    private async delay(ms: number) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    // Fetch HTML using Axios with headers
     private async fetchHtml(url: string) {
         try {
-            const response = await axios.get(url, {
-                headers: {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-                    "Accept-Language": "en-US,en;q=0.9",
-                },
-            });
+            const response = await axios.get(url);
             this.results.status = response.status;
             return cheerio.load(response.data);
         } catch (error) {
@@ -36,32 +26,9 @@ class Asurascans {
         }
     }
 
-    // Fetch HTML using Puppeteer (for advanced JS rendering)
-    private async fetchHtmlWithPuppeteer(url: string) {
-        const browser = await puppeteer.launch({ headless: true });
-        const page = await browser.newPage();
-
-        await page.setUserAgent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        );
-
-        try {
-            await page.goto(url, { waitUntil: "networkidle2" });
-            const content = await page.content();
-            const $ = cheerio.load(content);
-            await browser.close();
-            return $;
-        } catch (error) {
-            await browser.close();
-            this.results.status = "Error fetching data";
-            throw error;
-        }
-    }
-
-    // Search for content
     async search(query: string) {
         try {
-            const url = `${this.parentUrl}/?s=${query}`;
+            const url = `${this.proxyUrl}${this.parentUrl}/?s=${query}`;
             const $ = await this.fetchHtml(url);
 
             const cards = $("#content > div > div.postbody > div > div.listupd > div > div.bsx");
@@ -84,11 +51,10 @@ class Asurascans {
         }
     }
 
-    // Get info about a specific item
     async info(id: string) {
         try {
-            const url = `${this.parentUrl}/manga/${id}`;
-            const $ = await this.fetchHtmlWithPuppeteer(url);
+            const url = `${this.proxyUrl}${this.parentUrl}/manga/${id}`;
+            const $ = await this.fetchHtml(url);
 
             const content: any = {
                 images: $("div.seriestucon > div.seriestucontent > div.seriestucontl > div.thumb > img").attr("data-src"),
@@ -122,10 +88,48 @@ class Asurascans {
         }
     }
 
-    // Fetch latest content
+    async pages(id: string) {
+        try {
+            const url = `${this.proxyUrl}${this.parentUrl}/${id}`;
+            const $ = await this.fetchHtml(url);
+
+            const images = $("#readerarea > p > img").map((_, el) => $(el).attr("data-src")).get();
+            this.results.results = images;
+            return this.results;
+        } catch (error) {
+            this.results.results = [error.message];
+            return this.results;
+        }
+    }
+
+    async popular() {
+        try {
+            const url = `${this.proxyUrl}${this.parentUrl}`;
+            const $ = await this.fetchHtml(url);
+
+            const cards = $("#content > div > div.hotslid > div > div.listupd.popularslider > div > div > div.bsx");
+            const content: any[] = [];
+
+            cards.each((_, element) => {
+                const title = $(element).find("a").attr("title");
+                const id = $(element).find("a").attr("href")?.split("/").slice(-2, -1)[0];
+                const image = $(element).find("img.ts-post-image").attr("data-src");
+                const chapters = $(element).find("div.epxs").text();
+
+                content.push({ title, id, image, chapters });
+            });
+
+            this.results.results.push(content);
+            return this.results;
+        } catch (error) {
+            this.results.results = [error.message];
+            return this.results;
+        }
+    }
+
     async latest(page: string = "1") {
         try {
-            const url = `${this.parentUrl}/manga/?page=${page}&order=update`;
+            const url = `${this.proxyUrl}${this.parentUrl}/manga/?page=${page}&order=update`;
             const $ = await this.fetchHtml(url);
 
             const cards = $("#content > div > div.postbody > div.bixbox.seriesearch > div.mrgn > div.listupd > div > div.bsx");
@@ -134,7 +138,32 @@ class Asurascans {
             cards.each((_, element) => {
                 const title = $(element).find("a").attr("title");
                 const id = $(element).find("a").attr("href")?.split("/").slice(-2, -1)[0];
-                const image = $(element).find("img.ts-post-image").attr("src");
+                const image = $(element).find("img.ts-post-image").attr("data-src");
+                const chapters = $(element).find("div.epxs").text();
+
+                content.push({ title, id, image, chapters });
+            });
+
+            this.results.results.push(content);
+            return this.results;
+        } catch (error) {
+            this.results.results = [error.message];
+            return this.results;
+        }
+    }
+
+    async genres(type: string) {
+        try {
+            const url = `${this.proxyUrl}${this.parentUrl}/genres/${type}`;
+            const $ = await this.fetchHtml(url);
+
+            const cards = $("#content > div > div > div > div.listupd > div > div.bsx");
+            const content: any[] = [];
+
+            cards.each((_, element) => {
+                const title = $(element).find("a").attr("title");
+                const id = $(element).find("a").attr("href")?.split("/").slice(-2, -1)[0];
+                const image = $(element).find("img.ts-post-image").attr("data-src");
                 const chapters = $(element).find("div.epxs").text();
 
                 content.push({ title, id, image, chapters });
